@@ -1,0 +1,72 @@
+######################################################################################################
+# THIS IS A VIRTUAL COMMAND LINE CREATED SERVER RUNNING LOCALLY THAT IMITATES ACTUAL SERVER OUTSIDE  #
+# PURPOSE OF THIS IS TO LEARN AND TO TRY AND TO SEE THE OUTCOMES OF A CYBERSECURITY OR HACK ATTACKS #
+# PREPARED CREATED TESTED AND DONE BY HANSOLO-MOHD FIROZ                                             #
+# PURELY FOR EDUCATIONAL AND TRAINING PURPOSE                                                        # 
+######################################################################################################
+services:
+
+  ############################
+  # Web Application Layer (DMZ Boundary)
+  ############################
+  web_server:
+    image: vulnerables/web-dvwa
+    container_name: local1_core
+    ports:
+      - "127.0.0.1:8080:80"  # This is the only entry point from your host browser
+    networks:
+      - dmz_network
+      - secure_backplane     # Dual-homed so it can talk to the backend data assets
+    depends_on:
+      - fin_database
+
+  #################################
+  # Isolated Financial Database Node
+  #################################
+  fin_database:
+    image: docker.io/library/mariadb:latest
+    container_name: local1_findb
+    # HOST PORTS STRIPPED: No longer exposed directly to the host. Hidden inside the backplane.
+    environment:
+      - MYSQL_ROOT_PASSWORD=secure_fin_pass
+      - MYSQL_DATABASE=financial_ledger
+    volumes:
+      - fin_data:/var/lib/mysql 
+    networks:
+      - secure_backplane
+
+  ##############################
+  # Internal Mail Server Target
+  #############################
+  mail_server:
+    image: ghcr.io/docker-mailserver/docker-mailserver:latest
+    container_name: local1_mail
+    hostname: mail
+    domainname: local1.local
+    # HOST PORTS STRIPPED: Mail transport happens entirely inside the secure perimeter
+    environment:
+      - ENABLE_SPAMASSASSIN=0
+      - ENABLE_CLAMAV=0
+      - OVERRIDE_HOSTNAME=mail.local1.local
+    volumes:
+      - mail_data:/var/mail        
+      - mail_state:/var/mail-state 
+    networks:
+      - secure_backplane
+
+####################################################
+# LAYER-3 ISOLATED NETWORKING PERIMETERS
+####################################################
+networks:
+  dmz_network:
+    internal: true  # Air-gapped boundary for edge processing
+  secure_backplane:
+    internal: true  # Completely hidden backend network lane (No Direct Host Ingress)
+
+####################################################
+# PERSISTENT STORAGE DECLARATIONS (THE HOST ANCHORS)
+####################################################
+volumes:
+  fin_data:      
+  mail_data:     
+  mail_state:    
